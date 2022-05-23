@@ -88,15 +88,22 @@ Write a query that gets the contact first name, contact last name, phone number,
 
 
 ```python
-# Replace None with appropriate SQL code
 q1 = """
-None
+SELECT
+    contactFirstName,
+    contactLastName,
+    phone,
+    addressLine1,
+    creditLimit
+FROM customers
+WHERE
+    state == 'CA'
+    AND creditLimit > 25000
 ;
 """
 
 q1_result = pd.read_sql(q1, conn)
 q1_result
-```
 
 The following code checks that your result is correct:
 
@@ -125,16 +132,21 @@ We are looking for customers with names like `"Australian Collectors, Co."` or `
 <img src='images/expected_output_q2.png'>
 
 
-```python
-# Replace None with appropriate SQL code
 q2 = """
-None
+SELECT
+    customerName,
+    state,
+    country
+FROM
+    customers
+WHERE
+    customerName LIKE '%Collect%'
+    AND country != 'USA'
 ;
 """
 
 q2_result = pd.read_sql(q2, conn)
 q2_result
-```
 
 The following code checks that your result is correct:
 
@@ -163,16 +175,21 @@ Here we'll only display the first 10 results.
 <img src='images/expected_output_q3.png'>
 
 
-```python
-# Replace None with appropriate SQL code
 q3 = """
-None
+SELECT
+    addressLine1,
+    addressLine2,
+    city,
+    state,
+    postalCode,
+    country
+FROM customers
+WHERE state IS NOT NULL
 ;
 """
 
 q3_result = pd.read_sql(q3, conn)
 q3_result.head(10)
-```
 
 The following code checks that your result is correct:
 
@@ -205,16 +222,18 @@ The two fields selected should be `state` and `average_credit_limit`, which is t
 <img src='images/expected_output_q4.png'>
 
 
-```python
-# Replace None with appropriate SQL code
 q4 = """
-None
+SELECT
+    state,
+    AVG(creditLimit) AS average_credit_limit
+FROM customers
+WHERE country = 'USA'
+GROUP BY state
 ;
 """
 
 q4_result = pd.read_sql(q4, conn)
 q4_result
-```
 
 The following code checks that your result is correct:
 
@@ -244,16 +263,20 @@ We will only display the first 15 results.
 
 <img src='images/expected_output_q5.png'>
 
-
-```python
-# Replace None with appropriate SQL code
 q5 = """
-None
+SELECT
+    c.customerName,
+    o.orderNumber,
+    o.status
+FROM
+    customers c
+    JOIN orders o
+        ON c.customerNumber = o.customerNumber
 ;
 """
 q5_result = pd.read_sql(q5, conn)
 q5_result.head(15)
-```
+
 
 The following code checks that your result is correct:
 
@@ -282,15 +305,22 @@ The three columns selected should be `customerName`, `customerNumber` and `total
 <img src='images/expected_output_q6.png'>
 
 
-```python
-# Replace None with appropriate SQL code
 q6 = """
-None
+SELECT
+    c.customerName,
+    c.customerNumber,
+    SUM(p.amount) AS total_payment_amount
+FROM
+    customers c
+    JOIN payments p
+        ON c.customerNumber = p.customerNumber
+GROUP BY c.customerName
+ORDER BY total_payment_amount DESC
+LIMIT 10
 ;
 """
 q6_result = pd.read_sql(q6, conn)
 q6_result
-```
 
 The following code checks that your result is correct:
 
@@ -323,30 +353,62 @@ The five columns selected should be `customerName`, `customerNumber`, `productNa
 
 ```python
 # Replace None with approprite SQL code
+
+
 q7 = """
-None
+SELECT
+    c.customerName,
+    c.customerNumber,
+    p.productName,
+    p.productCode,
+    SUM(od.quantityOrdered) AS total_ordered
+FROM
+    customers c
+        JOIN orders o
+            ON c.customerNumber = o.customerNumber
+        JOIN orderdetails od
+            ON od.orderNumber = o.orderNumber
+        JOIN products p
+            ON p.productCode = od.productCode
+GROUP BY c.customerNumber, od.productCode
+HAVING SUM(od.quantityOrdered) >= 10
+ORDER BY total_ordered
 ;
 """
+
+# Notes on "HAVING SUM(od.quantityOrdered) >= 10"
+# 1. this needs to be HAVING rather than WHERE because it is
+#    the result of GROUP BY then an aggregate (SUM)
+# 2. this cannot be SUM(total_ordered) because of the internal
+#    execution order of SQL. you can't use an alias (the name
+#    after AS) in a WHERE or HAVING clause; you have to use
+#    the original name (e.g. SUM(od.quantityOrdered)), or you
+#    can use a subquery, something like:
+"""
+SELECT * FROM (
+    SELECT
+        c.customerName,
+        c.customerNumber,
+        p.productName,
+        p.productCode,
+        SUM(od.quantityOrdered) AS total_ordered
+    FROM
+        customers c
+            JOIN orders o
+                ON c.customerNumber = o.customerNumber
+            JOIN orderdetails od
+                ON od.orderNumber = o.orderNumber
+            JOIN products p
+                ON p.productCode = od.productCode
+    GROUP BY c.customerNumber, od.productCode
+)
+WHERE total_ordered >= 10
+ORDER BY total_ordered
+;
+"""
+
 q7_result = pd.read_sql(q7, conn)
 q7_result
-```
-
-The following code checks that your result is correct:
-
-
-```python
-# Run this cell without changes
-
-# Testing which columns are returned
-assert list(q7_result.columns) == ['customerName', 'customerNumber', 'productName', 'productCode', 'total_ordered']
-
-# Testing how many rows are returned
-assert len(q7_result) == 2531
-
-# Testing the values in the first result
-assert list(q7_result.iloc[0]) == ['Petit Auto', 314, '1913 Ford Model T Speedster', 'S18_2949', 10]
-```
-
 ### Query 8: Employees in Offices with Fewer than Five Employees
 
 Finally, get the first name, last name, employee number, and office code for employees from offices with fewer than 5 employees.
@@ -361,13 +423,23 @@ Finally, get the first name, last name, employee number, and office code for emp
 ```python
 # Replace None with approprite SQL code
 q8 = """
-None
-;
+SELECT
+    lastName,
+    firstName,
+    employeeNumber,
+    officeCode
+FROM employees
+WHERE officeCode IN (
+    SELECT o.officeCode
+    FROM offices o
+        JOIN employees e
+            ON o.officeCode = e.officeCode
+    GROUP BY o.officeCode
+    HAVING COUNT(e.employeeNumber) < 5
+);
 """
 q8_result = pd.read_sql(q8, conn)
 q8_result
-```
-
 The following code checks that your result is correct:
 
 
